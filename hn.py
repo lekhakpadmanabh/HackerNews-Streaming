@@ -22,11 +22,13 @@ __all__ = ['HNStream']
 
 
 class Item:
+
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
 
 class HackerNews:
+
     def __init__(self):
         self.base_url = 'https://hacker-news.firebaseio.com/v0/{api}'
 
@@ -43,6 +45,7 @@ class HackerNews:
 
 
 class SimpleFIFO:
+
     def __init__(self, length):
         self.length = length
         self.values = length * [None]
@@ -62,6 +65,7 @@ class SimpleFIFO:
 
 
 class HNStream(threading.Thread):
+
     def __init__(self):
         threading.Thread.__init__(self)
 
