@@ -19,8 +19,7 @@ from hn import HNStream
 h = HNStream()
 
 for item in h.stream():
-    # do something interesting, like..
-    if 'python' in item.title.lower():
-        # trigger a custom alert you've written, like..
+    if 'python' in item['title'].lower():
+        # trigger a custom alert you've written
         send_email(subject="New python post!", body="<a href='{}'>Link!</a>".format(item.url))
 ```
