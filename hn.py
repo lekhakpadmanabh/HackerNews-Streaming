@@ -102,7 +102,8 @@ class HNStream(threading.Thread):
             links = set(links)
             for link in links:
                 item_id = re.match(r'item\?id=(\d+)', str(link)).groups()[0]
-                if not item_id in itembuffer:
-                    itembuffer.append(item_id)
-                    yield HackerNews().item(item_id)
-            time.sleep(30) #from robots.txt
+                if item_id in itembuffer:
+                    continue
+                itembuffer.append(item_id)
+                yield HackerNews().item(item_id)
+            time.sleep(30) # http://news.ycombinator.com/robots.txt
