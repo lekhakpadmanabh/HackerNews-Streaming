@@ -6,8 +6,8 @@ from hn import HNStream
 h = HNStream()
 
 for item in h.stream():
-    print("Title: ', item.title)
-    print("By user: ", item.by)
+    print("Title: ', item['title'])
+    print("By user: ", item['by'])
 """
 
 import collections
@@ -21,69 +21,8 @@ try:
 except ImportError:
     import json
 
+
 __all__ = ['HNStream']
-
-
-class HackerNewsAPIError(Exception):
-    pass
-
-
-class Item:
-    """
-    Object representation of JSON response.
-    For internal use, should never be
-    instantiated by the user. 
-    An instance of this class is yielded
-    by HNStream.stream() via HackerNews.item
-
-    Attributes:
-
-        title: unicode
-        type: unicode
-        id: int
-        by: unicode
-        score: int
-        text: unicode
-        time: int (unixepoch)
-        url: unicdoe
-        kids: list
-    """
-
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def __str__(self):
-        return "{}: {}".format(self.type, self.title)
-
-    __repr__ = __str__
-
-
-class HackerNews:
-    """
-    Wrapper to get an item from official
-    hacker news api. Not intended to be
-    used by user as it does not cover all
-    methods of API, only the ones required
-    for streaming new stories.
-
-    Method:
-
-        item(item_id): returns an instance of Item class
-    """
-
-    def __init__(self):
-        self.base_url = 'https://hacker-news.firebaseio.com/v0/'
-
-    def _get(self, uri):
-        response = requests.get(uri)
-        if response.status_code == requests.codes.ok:
-            return json.loads(response.text)
-        else:
-            raise HackerNewsAPIError('HTTP Error {}'.format(response.status_code))
-
-    def item(self, item_id):
-        uri = self.base_url + 'item/{}.json'.format(item_id)
-        return Item(**self._get(uri))
 
 
 class HNStream(threading.Thread):
@@ -91,19 +30,56 @@ class HNStream(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
 
+    def get(self, uri):
+        cnt=0
+        while cnt < 3:
+            try:
+                response = requests.get(uri)
+                if response.status_code == requests.codes.ok:
+                    return response.text
+            except requests.exceptions.RequestException as e:
+                cnt += 1
+                time.sleep(2**cnt)
+                continue
+        return False
+
+    def get_item(self, item_id):
+        """
+        return type dictionary
+        key: type(value)
+
+            title: unicode
+            type: unicode
+            id: int
+            by: unicode
+            score: int
+            text: unicode
+            time: int (unixepoch)
+            url: unicode
+            kids: list
+        """
+
+        uri = 'https://hacker-news.firebaseio.com/v0/item/{}.json'.format(item_id)
+        resp = json.loads(self.get(uri))
+        return resp if resp else None
+
     def stream(self):
-        itembuffer = collections.deque(61*[None], 61)
+        itembuffer = collections.deque(60*[None], 60)
         while True:
-            r = requests.get('https://news.ycombinator.com/newest')
-            tree = lh.fromstring(r.text)
-            # http://stackoverflow.com/a/2756994
-            links = tree.xpath("//a[re:match(@href, 'item\?id=\d+')]/@href",
-                               namespaces={"re": "http://exslt.org/regular-expressions"})
-            links = set(links)
-            for link in links:
+            raw_html = self.get("http://news.ycombinator.com/newest")
+            if not raw_html:
+                time.sleep(30)
+                continue
+            tree = lh.fromstring(raw_html)
+            for link in set(tree.xpath(
+                  "//a[re:match(@href, 'item\?id=\d+')]/@href",
+                  namespaces={"re": "http://exslt.org/regular-expressions"})):
                 item_id = re.match(r'item\?id=(\d+)', str(link)).groups()[0]
                 if item_id in itembuffer:
                     continue
                 itembuffer.append(item_id)
-                yield HackerNews().item(item_id)
-            time.sleep(30) # http://news.ycombinator.com/robots.txt
+                resp = self.get_item(item_id)
+                if not resp:
+                    continue
+                yield resp
+            time.sleep(30) #robots.txt crawl delay 
