@@ -3,7 +3,7 @@ Hacker News recently released an official API. Unfortunately, it cannot be used 
 Can be useful if you want to create cusotm alerts (like email notifications or gtk notifications) with a simple script.
 
 ```
-pip install lxml ujson
+pip install lxml ujson requests
 ```
 
 
