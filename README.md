@@ -6,6 +6,9 @@ Can be useful if you want to create cusotm alerts (like email notifications or g
 pip install lxml ujson
 ```
 
+
+Works with python 2.7 and python3
+
 Usage
 =====
 
@@ -16,7 +19,8 @@ from hn import HNStream
 h = HNStream()
 
 for item in h.stream():
-    #do something interesting, like:
+    # do something interesting, like..
     if 'python' in item.title.lower():
-        send_email(subject="New python post!")
+        # trigger a custom alert you've written, like..
+        send_email(subject="New python post!", body="<a href='{}'>Link!</a>".format(item.url))
 ```

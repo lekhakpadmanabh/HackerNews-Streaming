@@ -6,8 +6,8 @@ from hn import HNStream
 h = HNStream()
 
 for item in h.stream():
-    print "Title: ", item.title
-    print "By user: ", item.by
+    print("Title: ', item.title)
+    print("By user: ", item.by)
 """
 
 import collections
@@ -16,8 +16,10 @@ import re
 import requests
 import threading
 import time
-import ujson as json
-
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 __all__ = ['HNStream']
 
@@ -90,7 +92,7 @@ class HNStream(threading.Thread):
         threading.Thread.__init__(self)
 
     def stream(self):
-        itembuffer = collections.deque(61*[None],61)
+        itembuffer = collections.deque(61*[None], 61)
         while True:
             r = requests.get('https://news.ycombinator.com/newest')
             tree = lh.fromstring(r.text)
