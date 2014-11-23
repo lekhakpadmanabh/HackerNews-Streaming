@@ -6,7 +6,7 @@ from hn import HNStream
 h = HNStream()
 
 for item in h.stream():
-    print("Title: ', item['title'])
+    print("Title: ", item['title'])
     print("By user: ", item['by'])
 """
 
