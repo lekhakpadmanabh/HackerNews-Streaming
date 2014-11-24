@@ -11,6 +11,7 @@ for item in h.stream():
 """
 
 import collections
+import functools
 from lxml import html as lh
 import re
 import requests
@@ -22,59 +23,110 @@ except ImportError:
     import json
 
 
-__all__ = ['HNStream']
+__all__ = ['SubmissionStream']
 
 
-class HNStream(threading.Thread):
+class RetryOnInvalidSchema(object):
+    """Decorator that ensures that api response
+    is as expected, if not it retries to get appropriate
+    response. If appropriate response is not received
+    it returns None so that it can be caught by an if"""
+
+    def __init__(self, KEYS, MAX_TRIES):
+
+        self.KEYS = KEYS
+        self.MAX_TRIES = MAX_TRIES
+
+    def __call__(self, func):
+
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            tries = 0
+            while tries < self.MAX_TRIES:
+                try:
+                    res = func(*args, **kwargs)
+                    for key in self.KEYS:
+                        assert key in res
+                    break
+                except AssertionError:
+                    res = None
+                    time.sleep(2**tries)
+                    tries += 1
+                    continue
+            return res
+        return wrapped
+
+
+class HNBase(object):
 
     def __init__(self):
-        threading.Thread.__init__(self)
 
-    def get(self, uri):
-        cnt=0
-        while cnt < 3:
-            try:
-                response = requests.get(uri)
-                if response.status_code == requests.codes.ok:
-                    return response.text
-            except requests.exceptions.RequestException as e:
-                cnt += 1
-                time.sleep(2**cnt)
-                continue
-        return False
+        self._crawl_delay = 30
+        self.base_url = 'https://hacker-news.firebaseio.com/v0/'
+
+    @property
+    def crawl_delay(self):
+        return self._crawl_delay
+
+    @crawl_delay.setter
+    def crawl_delay(self, value):
+        if value < 30:
+            raise ValueError("Forbidden by robots.txt")
+        else:
+            self._crawl_delay = value
+
+    def _get(self, uri):
+        resp = requests.get(uri)
+        if resp.status_code == requests.codes.ok:
+            return resp.text
+        else:
+            return None
+
+    @RetryOnInvalidSchema(KEYS = ('by','id'), MAX_TRIES = 3)
+    def _get_api_response(self, uri):
+        return json.loads(self._get(uri))
 
     def get_item(self, item_id):
-        """
-        return type dictionary
-        key: type(value)
+        uri = self.base_url + 'item/{}.json'.format(item_id)
+        resp = self._get_api_response(uri)
+        return resp
 
-            title: unicode
-            type: unicode
-            id: int
-            by: unicode
-            score: int
-            text: unicode
-            time: int (unixepoch)
-            url: unicode
-            kids: list
-        """
-
-        uri = 'https://hacker-news.firebaseio.com/v0/item/{}.json'.format(item_id)
-        resp = json.loads(self.get(uri))
-        return resp if resp else None
-
-    def stream(self):
-        itembuffer = collections.deque(60*[None], 60)
-        while True:
-            raw_html = self.get("http://news.ycombinator.com/newest")
-            if not raw_html:
-                time.sleep(30)
-                continue
-            tree = lh.fromstring(raw_html)
-            for link in set(tree.xpath(
+    @staticmethod
+    def submission_xpath(raw_html):
+        return set(lh.fromstring(raw_html).xpath(
                   "//a[re:match(@href, 'item\?id=\d+')]/@href",
-                  namespaces={"re": "http://exslt.org/regular-expressions"})):
-                item_id = re.match(r'item\?id=(\d+)', str(link)).groups()[0]
+                  namespaces={"re": "http://exslt.org/regular-expressions"}))
+
+    @staticmethod
+    def comment_xpath(raw_html):
+        return lh.fromstring(raw_html).xpath('//a[text()="link"]/@href')
+
+    def get_newest_submissions(self):
+        return self._get_newest("http://news.ycombinator.com/newest", 
+                                HNBase.submission_xpath)
+
+    def get_newest_comments(self):
+        return self._get_newest("https://news.ycombinator.com/newcomments", 
+                                HNBase.comment_xpath)
+
+    def _get_newest(self, uri, xpath_eval):
+        raw_html = self._get(uri)
+        if not raw_html:
+            return None
+        items = xpath_eval(raw_html)
+        return map(lambda x: re.match(r'item\?id=(\d+)',
+                                      x).groups()[0], map(str, items))
+
+    def _stream(self, getter):
+
+        itembuffer = collections.deque(60*[None], 60)
+
+        while True:
+            item_ids = getter()
+            if not item_ids:
+                time.sleep(self.craw_delay)
+                continue
+            for item_id in item_ids:
                 if item_id in itembuffer:
                     continue
                 itembuffer.append(item_id)
@@ -82,4 +134,10 @@ class HNStream(threading.Thread):
                 if not resp:
                     continue
                 yield resp
-            time.sleep(30) #robots.txt crawl delay 
+            time.sleep(self.crawl_delay) 
+
+    def submission_stream(self):
+        yield from self._stream(self.get_newest_submissions)
+
+    def comment_stream(self):
+        yield from self._stream(self.get_newest_comments)
