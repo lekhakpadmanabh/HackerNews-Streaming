@@ -7,7 +7,6 @@ pip install lxml ujson requests
 ```
 
 
-Works with python 2.7 and python3
 
 Usage
 =====
@@ -21,5 +20,5 @@ h = HNStream()
 for item in h.stream():
     if 'python' in item['title'].lower():
         # trigger a custom alert you've written
-        send_email(subject="New python post!", body="<a href='{}'>Link!</a>".format(item['url']))
+        send_email(subject="Python post!", body="<a href='{}'>Link!</a>".format(item['url']))
 ```

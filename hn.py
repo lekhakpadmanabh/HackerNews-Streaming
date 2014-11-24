@@ -15,22 +15,20 @@ import functools
 from lxml import html as lh
 import re
 import requests
-import threading
 import time
+
 try:
     import ujson as json
 except ImportError:
     import json
 
-
 __all__ = ['SubmissionStream']
 
 
 class RetryOnInvalidSchema(object):
-    """Decorator that ensures that api response
-    is as expected, if not it retries to get appropriate
-    response. If appropriate response is not received
-    it returns None so that it can be caught by an if"""
+    """Decorator to check api response,
+    conduct retries and on eventual failure
+    return None"""
 
     def __init__(self, KEYS, MAX_TRIES):
 
@@ -50,15 +48,15 @@ class RetryOnInvalidSchema(object):
                     break
                 except AssertionError:
                     res = None
-                    time.sleep(2**tries)
+                    time.sleep(2 ** tries)
                     tries += 1
                     continue
             return res
+
         return wrapped
 
 
-class HNBase(object):
-
+class HNStream(object):
     def __init__(self):
 
         self._crawl_delay = 30
@@ -76,7 +74,8 @@ class HNBase(object):
         else:
             self._crawl_delay = value
 
-    def _get(self, uri):
+    @staticmethod
+    def _get(uri):
         resp = requests.get(uri)
         if resp.status_code == requests.codes.ok:
             return resp.text
@@ -85,7 +84,7 @@ class HNBase(object):
 
     @RetryOnInvalidSchema(KEYS=('by', 'id'), MAX_TRIES=3)
     def _get_api_response(self, uri):
-        return json.loads(self._get(uri))
+        return json.loads(HNStream._get(uri))
 
     def get_item(self, item_id):
         uri = self.api_url + 'item/{}.json'.format(item_id)
@@ -95,32 +94,32 @@ class HNBase(object):
     @staticmethod
     def submission_xpath(raw_html):
         return set(lh.fromstring(raw_html).xpath(
-                  "//a[re:match(@href, 'item\?id=\d+')]/@href",
-                  namespaces={"re": "http://exslt.org/regular-expressions"}))
+            "//a[re:match(@href, 'item\?id=\d+')]/@href",
+            namespaces={"re": "http://exslt.org/regular-expressions"}))
 
     @staticmethod
     def comment_xpath(raw_html):
         return lh.fromstring(raw_html).xpath('//a[text()="link"]/@href')
 
-    def get_newest_submissions(self):
-        return self._get_newest(self.web_url + 'newest', 
-                                HNBase.submission_xpath)
-
-    def get_newest_comments(self):
-        return self._get_newest(self.web_url + 'newcomments', 
-                                HNBase.comment_xpath)
-
     def _get_newest(self, uri, xpath_eval):
-        raw_html = self._get(uri)
+        raw_html = HNStream._get(uri)
         if not raw_html:
             return None
         items = xpath_eval(raw_html)
         return map(lambda x: re.match(r'item\?id=(\d+)',
                                       x).groups()[0], map(str, items))
 
+    def get_newest_submissions(self):
+        return self._get_newest(self.web_url + 'newest',
+                                HNStream.submission_xpath)
+
+    def get_newest_comments(self):
+        return self._get_newest(self.web_url + 'newcomments',
+                                HNStream.comment_xpath)
+
     def _stream(self, getter):
 
-        itembuffer = collections.deque(60*[None], 60)
+        itembuffer = collections.deque(60 * [None], 60)
 
         while True:
             item_ids = getter()
@@ -135,7 +134,7 @@ class HNBase(object):
                 if not resp:
                     continue
                 yield resp
-            time.sleep(self.crawl_delay) 
+            time.sleep(self.crawl_delay)
 
     def submission_stream(self):
         yield from self._stream(self.get_newest_submissions)
