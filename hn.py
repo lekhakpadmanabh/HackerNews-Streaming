@@ -5,7 +5,7 @@ from hn import HNStream
 
 h = HNStream()
 
-for item in h.stream():
+for item in h.submission_stream():
     print("Title: ", item['title'])
     print("By user: ", item['by'])
 """
@@ -22,7 +22,7 @@ try:
 except ImportError:
     import json
 
-__all__ = ['SubmissionStream']
+__all__ = ['HNStream']
 
 
 class RetryOnInvalidSchema(object):

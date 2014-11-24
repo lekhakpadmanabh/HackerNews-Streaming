@@ -17,8 +17,16 @@ from hn import HNStream
 
 h = HNStream()
 
-for item in h.stream():
+for item in h.submission_stream():
     if 'python' in item['title'].lower():
         # trigger a custom alert you've written
         send_email(subject="Python post!", body="<a href='{}'>Link!</a>".format(item['url']))
+```
+Or if you want to listen for comments
+
+```python
+
+for comment in h.comment_stream():
+    if comment['by'] == 'tptacek':
+        print (comment['text'])
 ```
