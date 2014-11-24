@@ -22,7 +22,6 @@ try:
 except ImportError:
     import json
 
-
 __all__ = ['HNStream']
 
 
@@ -53,21 +52,14 @@ class RetryOnInvalidSchema(object):
                     tries += 1
                     continue
             return res
+
         return wrapped
 
 
 class HNStream(object):
-    """
-    property:
-        crawl_delay: defaults to 30 (seconds), must be  >=30
-
-    public methods:
-        get_item(item_id): returns a dictionary for given item_id
-        submission_stream(): indefinitely yields new submissions
-        comment_stream(): indefinitely yields new comments
-    """
 
     def __init__(self):
+
         self._crawl_delay = 30
         self.api_url = 'https://hacker-news.firebaseio.com/v0/'
         self.web_url = 'https://news.ycombinator.com/'
@@ -96,10 +88,6 @@ class HNStream(object):
         return json.loads(HNStream._get(uri))
 
     def get_item(self, item_id):
-        """
-        See: https://github.com/HackerNews/API#items
-        for a description of fields.
-        """
         uri = self.api_url + 'item/{}.json'.format(item_id)
         resp = self._get_api_response(uri)
         return resp
@@ -122,11 +110,11 @@ class HNStream(object):
         return map(lambda x: re.match(r'item\?id=(\d+)',
                                       x).groups()[0], map(str, items))
 
-    def _get_new_submissions(self):
+    def get_newest_submissions(self):
         return self._get_newest(self.web_url + 'newest',
                                 HNStream.submission_xpath)
 
-    def _get_new_comments(self):
+    def get_newest_comments(self):
         return self._get_newest(self.web_url + 'newcomments',
                                 HNStream.comment_xpath)
 
@@ -150,7 +138,9 @@ class HNStream(object):
             time.sleep(self.crawl_delay)
 
     def submission_stream(self):
-        yield from self._stream(self._get_new_submissions)
+        for sub in self._stream(self.get_newest_submissions):
+            yield sub
 
     def comment_stream(self):
-        yield from self._stream(self._get_new_comments)
+        for comm in self._stream(self.get_newest_comments):
+            yield comm
