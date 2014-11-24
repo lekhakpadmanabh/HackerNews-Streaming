@@ -62,7 +62,8 @@ class HNBase(object):
     def __init__(self):
 
         self._crawl_delay = 30
-        self.base_url = 'https://hacker-news.firebaseio.com/v0/'
+        self.api_url = 'https://hacker-news.firebaseio.com/v0/'
+        self.web_url = 'https://news.ycombinator.com/'
 
     @property
     def crawl_delay(self):
@@ -82,12 +83,12 @@ class HNBase(object):
         else:
             return None
 
-    @RetryOnInvalidSchema(KEYS = ('by','id'), MAX_TRIES = 3)
+    @RetryOnInvalidSchema(KEYS=('by', 'id'), MAX_TRIES=3)
     def _get_api_response(self, uri):
         return json.loads(self._get(uri))
 
     def get_item(self, item_id):
-        uri = self.base_url + 'item/{}.json'.format(item_id)
+        uri = self.api_url + 'item/{}.json'.format(item_id)
         resp = self._get_api_response(uri)
         return resp
 
@@ -102,11 +103,11 @@ class HNBase(object):
         return lh.fromstring(raw_html).xpath('//a[text()="link"]/@href')
 
     def get_newest_submissions(self):
-        return self._get_newest("http://news.ycombinator.com/newest", 
+        return self._get_newest(self.web_url + 'newest', 
                                 HNBase.submission_xpath)
 
     def get_newest_comments(self):
-        return self._get_newest("https://news.ycombinator.com/newcomments", 
+        return self._get_newest(self.web_url + 'newcomments', 
                                 HNBase.comment_xpath)
 
     def _get_newest(self, uri, xpath_eval):
