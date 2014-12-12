@@ -1,7 +1,7 @@
 """
 Usage:
 
-from hn import HNStream
+from hnpy2 import HNStream
 
 h = HNStream()
 
@@ -46,7 +46,7 @@ class RetryOnInvalidSchema(object):
                     for key in self.KEYS:
                         assert key in res
                     break
-                except AssertionError:
+                except AssertionError, TypeError:
                     res = None
                     time.sleep(2 ** tries)
                     tries += 1
@@ -60,7 +60,7 @@ class HNStream(object):
 
     def __init__(self):
 
-        self._crawl_delay = 30
+        self._crawl_delay = 60
         self.api_url = 'https://hacker-news.firebaseio.com/v0/'
         self.web_url = 'https://news.ycombinator.com/'
 
@@ -77,10 +77,12 @@ class HNStream(object):
 
     @staticmethod
     def _get(uri):
-        resp = requests.get(uri)
-        if resp.status_code == requests.codes.ok:
-            return resp.text
-        else:
+        try:
+            resp = requests.get(uri)
+            if resp.status_code == requests.codes.ok:
+                return resp.text
+            return None
+        except requests.exceptions.RequestException:
             return None
 
     @RetryOnInvalidSchema(KEYS=('by', 'id'), MAX_TRIES=3)
@@ -125,7 +127,7 @@ class HNStream(object):
         while True:
             item_ids = getter()
             if not item_ids:
-                time.sleep(self.craw_delay)
+                time.sleep(self.crawl_delay)
                 continue
             for item_id in item_ids:
                 if item_id in itembuffer:
