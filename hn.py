@@ -47,7 +47,7 @@ class RetryOnInvalidSchema(object):
                     for key in self.KEYS:
                         assert key in res
                     break
-                except AssertionError, TypeError:
+                except (AssertionError, TypeError):
                     res = None
                     time.sleep(2 ** tries)
                     tries += 1
